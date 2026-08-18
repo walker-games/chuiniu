@@ -9,7 +9,7 @@ import LangSwitcher from '@/components/LangSwitcher.vue'
 
 const { t } = useI18n()
 const router = useRouter()
-const { ready, inTelegram, startParam } = useTelegram()
+const { ready, inTelegram, startParam, tg } = useTelegram()
 const authStore = useAuthStore()
 
 const inviteCode = ref('')
@@ -66,6 +66,12 @@ async function handleJoin(code: string) {
   } finally {
     loading.value = false
   }
+}
+
+function openJobContact() {
+  const url = 'https://t.me/petterZZ'
+  if (tg?.openTelegramLink) tg.openTelegramLink(url)
+  else window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 onMounted(async () => {
@@ -144,6 +150,11 @@ onMounted(async () => {
         </button>
         <LangSwitcher />
       </div>
+      <button class="developer-contact animate-fade-up" type="button" style="animation-delay: 320ms" @click="openJobContact">
+        <span class="developer-contact-copy"><small>{{ t('home.creatorLabel') }}</small><strong>{{ t('home.remoteWork') }}</strong></span>
+        <span class="developer-contact-tg"><small>{{ t('home.jobContact') }}</small><b>@petterZZ</b></span>
+        <span class="developer-contact-arrow" aria-hidden="true">↗</span>
+      </button>
     </div>
   </div>
 </template>
@@ -182,6 +193,31 @@ onMounted(async () => {
   align-items: center;
   gap: 16px;
 }
+
+.developer-contact {
+  width: min(340px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid oklch(72% 0.12 75 / 0.42);
+  border-radius: 12px;
+  background: oklch(17% 0.035 55 / 0.88);
+  color: oklch(91% 0.05 80);
+  text-align: left;
+  box-shadow: 0 12px 30px oklch(5% 0.02 55 / 0.32);
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1), border-color 180ms ease;
+}
+
+.developer-contact:active { transform: translateY(1px); border-color: oklch(82% 0.14 80 / 0.72); }
+.developer-contact-copy, .developer-contact-tg { display: grid; gap: 3px; }
+.developer-contact-copy small, .developer-contact-tg small { color: oklch(72% 0.045 75); font-size: 9px; line-height: 1.2; }
+.developer-contact-copy strong { color: oklch(92% 0.07 82); font-size: 13px; white-space: nowrap; }
+.developer-contact-tg { justify-items: end; }
+.developer-contact-tg b { color: oklch(82% 0.14 80); font-size: 12px; }
+.developer-contact-arrow { color: oklch(82% 0.14 80); font-size: 17px; }
 
 /* ── Content ── */
 .home-content {

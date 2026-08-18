@@ -22,6 +22,9 @@ export type MessageSchema = {
     joinRoom: string
     roomCodePlaceholder: string
     history: string
+    creatorLabel: string
+    remoteWork: string
+    jobContact: string
     errorCreate: string
     errorJoin: string
     defaultPlayerName: string
