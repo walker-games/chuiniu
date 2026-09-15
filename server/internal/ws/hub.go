@@ -4,27 +4,32 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/walker-games/chuiniu-server/internal/game"
 	"github.com/walker-games/chuiniu-server/internal/service"
 )
 
 type Hub struct {
-	rooms      map[string]map[string]*Client // roomID -> playerID -> Client
-	mu         sync.RWMutex
-	Register   chan *Client
-	Unregister chan *Client
-	Manager    *game.RoomManager
-	LogService *service.GameLogService
+	rooms         map[string]map[string]*Client // roomID -> playerID -> Client
+	mu            sync.RWMutex
+	Register      chan *Client
+	Unregister    chan *Client
+	Manager       *game.RoomManager
+	LogService    *service.GameLogService
+	SnapshotStore *service.RoomSnapshotStore
+	botJobs       map[string]bool
 }
 
-func NewHub(manager *game.RoomManager, logService *service.GameLogService) *Hub {
+func NewHub(manager *game.RoomManager, logService *service.GameLogService, snapshotStore *service.RoomSnapshotStore) *Hub {
 	return &Hub{
-		rooms:      make(map[string]map[string]*Client),
-		Register:   make(chan *Client, 64),
-		Unregister: make(chan *Client, 64),
-		Manager:    manager,
-		LogService: logService,
+		rooms:         make(map[string]map[string]*Client),
+		Register:      make(chan *Client, 64),
+		Unregister:    make(chan *Client, 64),
+		Manager:       manager,
+		LogService:    logService,
+		SnapshotStore: snapshotStore,
+		botJobs:       make(map[string]bool),
 	}
 }
 
@@ -181,6 +186,7 @@ func (h *Hub) handleReady(c *Client, data json.RawMessage) {
 			"round": room.RoundNum,
 		}))
 		h.BroadcastRoomState(room)
+		h.scheduleBotAction(room.ID)
 	}
 }
 
@@ -213,6 +219,7 @@ func (h *Hub) handleRoll(c *Client) {
 			"turn_player_id": room.CurrentTurnPlayerID(),
 		}))
 		h.BroadcastRoomState(room)
+		h.scheduleBotAction(room.ID)
 	}
 }
 
@@ -267,6 +274,72 @@ func (h *Hub) handleBid(c *Client, data json.RawMessage) {
 	}))
 
 	h.BroadcastRoomState(room)
+	h.scheduleBotAction(room.ID)
+}
+
+func (h *Hub) scheduleBotAction(roomID string) {
+	h.mu.Lock()
+	if h.botJobs[roomID] {
+		h.mu.Unlock()
+		return
+	}
+	h.botJobs[roomID] = true
+	h.mu.Unlock()
+	go func() {
+		time.Sleep(900 * time.Millisecond)
+		h.mu.Lock()
+		delete(h.botJobs, roomID)
+		h.mu.Unlock()
+		h.runBotAction(roomID)
+	}()
+}
+
+// EnsureAutomation restarts a pending bot turn after a room has been restored
+// from Redis and a human reconnects.
+func (h *Hub) EnsureAutomation(room *game.Room) { h.scheduleBotAction(room.ID) }
+
+func (h *Hub) runBotAction(roomID string) {
+	room := h.Manager.GetRoom(roomID)
+	if room == nil || room.Round == nil {
+		return
+	}
+	if room.Round.Phase == game.PhaseRolling {
+		for _, player := range room.Players {
+			if player.IsBot && !player.Rolled {
+				room.RollDice(player.ID)
+			}
+		}
+		if room.AllRolled() {
+			room.Round.Phase = game.PhaseBidding
+			h.BroadcastToRoom(roomID, NewMessage(MsgAllRolled, map[string]interface{}{"turn_player_id": room.CurrentTurnPlayerID()}))
+			h.BroadcastRoomState(room)
+			h.scheduleBotAction(roomID)
+		}
+		return
+	}
+	if room.Round.Phase != game.PhaseBidding {
+		return
+	}
+	bot := room.GetPlayer(room.CurrentTurnPlayerID())
+	if bot == nil || !bot.IsBot {
+		return
+	}
+	decision := game.DecideBotTurn(room, bot)
+	h.BroadcastToRoom(roomID, NewMessage(MsgVoiceCue, map[string]string{"actor_id": bot.ID, "cue": "bot.thinking"}))
+	if decision.Challenge {
+		h.resolveChallenge(room, bot.ID)
+		return
+	}
+	if decision.Bid == nil {
+		return
+	}
+	room.Round.CurrentBid = decision.Bid
+	room.Round.BidHistory = append(room.Round.BidHistory, decision.Bid)
+	room.Round.TurnIndex = (room.Round.TurnIndex + 1) % len(room.Round.TurnOrder)
+	h.BroadcastToRoom(roomID, NewMessage(MsgBidMade, map[string]interface{}{"player_id": bot.ID, "count": decision.Bid.Count, "face": decision.Bid.Face, "mode": decision.Bid.Mode}))
+	h.BroadcastToRoom(roomID, NewMessage(MsgTurnChange, map[string]string{"turn_player_id": room.CurrentTurnPlayerID()}))
+	h.BroadcastToRoom(roomID, NewMessage(MsgVoiceCue, map[string]string{"actor_id": bot.ID, "cue": "bot.bid"}))
+	h.BroadcastRoomState(room)
 }
 
 func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
@@ -285,6 +358,10 @@ func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
 		return
 	}
 
+	h.resolveChallenge(room, c.PlayerID)
+}
+
+func (h *Hub) resolveChallenge(room *game.Room, challengerID string) {
 	// Collect all dice
 	allDice := make(map[string][]int)
 	for _, p := range room.Players {
@@ -295,7 +372,7 @@ func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
 
 	bid := room.Round.CurrentBid
 	log.Printf("[Challenge] bid: %d×%d mode=%s, allDice: %v", bid.Count, bid.Face, bid.Mode, allDice)
-	winner, loser, actualCount := game.ResolveChallenge(c.PlayerID, bid, allDice)
+	winner, loser, actualCount := game.ResolveChallenge(challengerID, bid, allDice)
 	log.Printf("[Challenge] result: winner=%s loser=%s actual=%d", winner, loser, actualCount)
 
 	// Pick punishment
@@ -312,8 +389,8 @@ func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
 	}
 
 	// Broadcast challenge result with all dice revealed
-	h.BroadcastToRoom(c.RoomID, NewMessage(MsgChallengeResult, map[string]interface{}{
-		"challenger":   c.PlayerID,
+	h.BroadcastToRoom(room.ID, NewMessage(MsgChallengeResult, map[string]interface{}{
+		"challenger":   challengerID,
 		"bid":          bid,
 		"all_dice":     allDice,
 		"actual_count": actualCount,
@@ -321,21 +398,21 @@ func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
 		"loser":        loser,
 	}))
 
-	h.BroadcastToRoom(c.RoomID, NewMessage(MsgPunishment, map[string]interface{}{
+	h.BroadcastToRoom(room.ID, NewMessage(MsgPunishment, map[string]interface{}{
 		"loser":           loser,
 		"punishment_key":  punishment.Key,
 		"punishment_text": punishment.Text,
 		"level":           punishment.Level,
 	}))
 
-	h.BroadcastToRoom(c.RoomID, NewMessage(MsgRoundEnd, map[string]interface{}{
+	h.BroadcastToRoom(room.ID, NewMessage(MsgRoundEnd, map[string]interface{}{
 		"round":  room.RoundNum,
 		"winner": winner,
 		"loser":  loser,
 	}))
 
 	// Async log
-	go h.LogService.SaveRound(room, allDice, c.PlayerID, winner, loser, punishment)
+	go h.LogService.SaveRound(room, allDice, challengerID, winner, loser, punishment)
 
 	// Record last loser for next round first-caller
 	room.LastLoser = loser
@@ -344,7 +421,9 @@ func (h *Hub) handleChallenge(c *Client, data json.RawMessage) {
 	room.Status = game.StatusWaiting
 	room.Round = nil
 	for _, p := range room.Players {
-		p.Ready = false
+		// A solo opponent is always ready for the rematch. Human players still
+		// explicitly opt in, so remote tables never restart by surprise.
+		p.Ready = p.IsBot
 		p.Dice = nil
 		p.Rolled = false
 	}
@@ -366,6 +445,7 @@ func (h *Hub) handleEmoji(c *Client, data json.RawMessage) {
 }
 
 func (h *Hub) BroadcastRoomState(room *game.Room) {
+	h.persistRoom(room)
 	h.mu.RLock()
 	clients, ok := h.rooms[room.ID]
 	h.mu.RUnlock()
@@ -377,6 +457,17 @@ func (h *Hub) BroadcastRoomState(room *game.Room) {
 		state := h.BuildRoomStateForPlayer(room, playerID)
 		c.SendMessage(NewMessage(MsgRoomState, state))
 	}
+}
+
+func (h *Hub) persistRoom(room *game.Room) {
+	if h.SnapshotStore == nil {
+		return
+	}
+	go func() {
+		if err := h.SnapshotStore.Save(room); err != nil {
+			log.Printf("save room snapshot %s: %v", room.ID, err)
+		}
+	}()
 }
 
 // BuildRoomStateForPlayer builds a sanitized room state for a specific viewer.
@@ -392,6 +483,7 @@ func (h *Hub) BuildRoomStateForPlayer(room *game.Room, viewerID string) map[stri
 			"connected": p.Connected,
 			"score":     p.Score,
 			"rolled":    p.Rolled,
+			"is_bot":    p.IsBot,
 		}
 		if p.ID == viewerID {
 			pData["dice"] = p.Dice

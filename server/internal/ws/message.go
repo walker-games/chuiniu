@@ -39,6 +39,9 @@ const (
 	MsgPunishment      = "punishment"
 	MsgRoundEnd        = "round_end"
 	MsgPlayerEmoji     = "player_emoji"
+	// Voice cues are semantic keys. Each client resolves them with its own
+	// locale and a pre-generated voice asset; no spoken text is trusted from WS.
+	MsgVoiceCue         = "voice_cue"
 	MsgError           = "error"
 )
 

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useTelegram } from '@/composables/useTelegram'
 import { useAuthStore } from '@/stores/auth'
-import { createRoom } from '@/api/room'
+import { createRoom, joinRoom, listPublicRooms } from '@/api/room'
 import LangSwitcher from '@/components/LangSwitcher.vue'
 
 const { t } = useI18n()
@@ -12,9 +12,9 @@ const router = useRouter()
 const { ready, inTelegram, startParam, tg } = useTelegram()
 const authStore = useAuthStore()
 
-const inviteCode = ref('')
 const error = ref('')
 const loading = ref(false)
+const publicRooms = ref<Array<{ id: string; code: string; title: string; player_count: number; max_players: number }>>([])
 
 async function autoLogin() {
   if (authStore.isLoggedIn) return
@@ -54,11 +54,23 @@ async function handleCreate() {
   }
 }
 
+async function handleSolo() {
+  error.value = ''
+  loading.value = true
+  try {
+    const res = await createRoom(authStore.user?.name, true)
+    router.push(`/lobby/${res.room_id}`)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : t('home.errorCreate')
+  } finally {
+    loading.value = false
+  }
+}
+
 async function handleJoin(code: string) {
   error.value = ''
   loading.value = true
   try {
-    const { joinRoom } = await import('@/api/room')
     const res = await joinRoom(code, authStore.user?.name)
     router.push(`/lobby/${res.room_id}`)
   } catch (e: unknown) {
@@ -78,6 +90,8 @@ onMounted(async () => {
   ready()
   await autoLogin()
 
+  try { publicRooms.value = (await listPublicRooms()).rooms } catch { /* lobby cards are optional */ }
+
   const urlCode = new URLSearchParams(window.location.search).get('code')
   const joinCode = startParam.value || urlCode
   if (joinCode) {
@@ -90,6 +104,9 @@ onMounted(async () => {
   <div class="home-root">
     <!-- Background -->
     <div class="home-bg" />
+    <div class="party-light party-light--pink" />
+    <div class="party-light party-light--cyan" />
+    <div class="party-confetti" aria-hidden="true">✦　●　✦　◆　●　✦</div>
 
     <!-- Content -->
     <div class="home-content">
@@ -122,23 +139,18 @@ onMounted(async () => {
         <span class="font-serif-cn text-2xl tracking-[0.3em]">{{ t('home.createRoom') }}</span>
       </button>
 
-      <!-- Join room (compact) -->
-      <div class="home-join-row animate-fade-up stagger-4">
-        <input
-          v-model="inviteCode"
-          type="text"
-          :placeholder="t('home.roomCodePlaceholder')"
-          class="home-input-mini"
-          @keyup.enter="handleJoin(inviteCode.trim())"
-        />
-        <button
-          class="home-btn-join-mini"
-          :disabled="loading || !inviteCode.trim()"
-          @click="handleJoin(inviteCode.trim())"
-        >
-          <span class="font-serif-cn">{{ t('home.joinRoom') }}</span>
+      <button class="home-btn-solo animate-fade-up stagger-3" :disabled="loading" @click="handleSolo">
+        <span class="font-serif-cn text-lg tracking-[0.18em]">{{ t('home.soloBattle') }}</span>
+      </button>
+
+      <section v-if="publicRooms.length" class="public-tables animate-fade-up stagger-4">
+        <p class="public-tables-title">{{ t('home.publicTables') }}</p>
+        <button v-for="room in publicRooms" :key="room.id" class="public-table" :disabled="loading" @click="handleJoin(room.code)">
+          <span>{{ room.title }}</span><small>{{ room.player_count }}/{{ room.max_players }} · {{ t('home.joinTable') }}</small>
         </button>
-      </div>
+      </section>
+
+      <p class="private-room-hint animate-fade-up">好友局由分享链接直接入席</p>
 
       <!-- Footer row: history + lang switcher -->
       <div class="home-footer animate-fade-up" style="animation-delay: 250ms">
@@ -336,6 +348,20 @@ onMounted(async () => {
   transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms;
 }
 
+.home-btn-solo {
+  width: min(100%, 320px);
+  min-height: 48px;
+  margin-top: 10px;
+  border: 1px solid oklch(75% 0.12 75 / .65);
+  border-radius: 14px;
+  color: oklch(89% 0.09 82);
+  background: oklch(24% 0.04 55 / .78);
+}
+.public-tables { width: min(100%, 320px); margin-top: 16px; }
+.public-tables-title { color: oklch(74% 0.05 75); font-size: 12px; letter-spacing: .14em; margin-bottom: 8px; }
+.public-table { display: flex; justify-content: space-between; width: 100%; padding: 10px 12px; margin-top: 6px; border-radius: 10px; color: oklch(91% 0.04 80); background: oklch(18% 0.03 55 / .7); border: 1px solid oklch(65% 0.05 70 / .2); text-align: left; }
+.public-table small { color: oklch(68% 0.04 75); }
+
 .home-btn-create:active {
   transform: scale(0.97) translateY(1px);
   box-shadow:
@@ -436,4 +462,14 @@ onMounted(async () => {
 .home-history:active {
   color: oklch(60% 0.05 60);
 }
+/* Party art direction overrides: warm neon, moving light, no funeral-brown table. */
+.home-bg { background: radial-gradient(ellipse 78% 45% at 50% 32%, #ff4f9b55 0%, transparent 70%), radial-gradient(ellipse 70% 45% at 50% 88%, #6b52e555 0%, transparent 72%), linear-gradient(180deg, #301354 0%, #1c103b 100%); }
+.party-light { position:absolute; width:150px; height:150px; border-radius:50%; filter:blur(36px); opacity:.6; animation: party-pulse 4s ease-in-out infinite alternate; }
+.party-light--pink { top:16%; left:-72px; background:#ff3c91; }.party-light--cyan { top:50%; right:-86px; background:#2ad7e5; animation-delay:-2s; }
+.party-confetti { position:absolute; top:10%; left:0; width:100%; color:#ffdc70; opacity:.45; letter-spacing:20px; font-size:15px; transform:rotate(-10deg); animation:confetti-float 5s ease-in-out infinite alternate; }
+@keyframes party-pulse { to { transform:scale(1.3); opacity:.8; } } @keyframes confetti-float { to { transform:translateY(20px) rotate(-6deg); opacity:.7; } }
+.home-title { background:linear-gradient(180deg,#fff4bd 0%,#ffd34f 48%,#ff8c42 100%); -webkit-background-clip:text; background-clip:text; }.home-subtitle { color:#e6c4ff; }
+.home-btn-create { background:linear-gradient(135deg,#ffcb45,#ff8d35 56%,#ff4f91); color:#311338; box-shadow:0 1px 0 #fff5b0 inset,0 8px 24px #ff5d9790,0 0 40px #ffbd4545; }
+.home-btn-solo { border-color:#66e9ff; color:#eafeff; background:linear-gradient(135deg,#2b5ec7cc,#713dc4cc); box-shadow:0 5px 18px #3c95e955; }
+.public-tables { padding:12px; border-radius:18px; background:#130a2db8; border:1px solid #a87cf066; backdrop-filter:blur(12px); }.public-tables-title { color:#f1d7ff; }.public-table { border-radius:12px; color:#fff4d0; background:linear-gradient(100deg,#33205e,#46236b); border-color:#c987ff4d; }.public-table small { color:#ffe079; }
 </style>

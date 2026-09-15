@@ -25,6 +25,10 @@ func SetupRouter(cfg *config.Config, manager *game.RoomManager, hub *ws.Hub, log
 			"room_count": manager.RoomCount(),
 		})
 	})
+	// The lobby/BFF reads this catalogue before a player has authenticated.
+	// It contains no player identity or private dice state.
+	roomHandler := NewRoomHandler(manager)
+	r.GET("/public/rooms", roomHandler.ListPublic)
 
 	// Auth middleware
 	var authMiddleware gin.HandlerFunc
@@ -38,7 +42,6 @@ func SetupRouter(cfg *config.Config, manager *game.RoomManager, hub *ws.Hub, log
 	// REST API
 	api := r.Group("/api/v1", authMiddleware)
 	{
-		roomHandler := NewRoomHandler(manager)
 		api.POST("/rooms", roomHandler.Create)
 		api.GET("/rooms/:id", roomHandler.Get)
 		api.POST("/rooms/join", roomHandler.Join)

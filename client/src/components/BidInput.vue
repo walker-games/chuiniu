@@ -72,10 +72,18 @@ function isBidValid() {
 
 const canSubmit = computed(() => isBidValid() && count.value <= props.maxCount)
 const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('game.modeZhai'))
+const quickCounts = computed(() => Array.from({ length: Math.min(props.maxCount, 8) }, (_, index) => index + 1))
+
+function selectCount(value: number) {
+  if (value >= effectiveMinCount.value && value <= props.maxCount) count.value = value
+}
 </script>
 
 <template>
   <div class="bid-root">
+    <div class="quick-counts" aria-label="quick count selection">
+      <button v-for="value in quickCounts" :key="value" class="count-chip" :class="{ 'count-chip--active': count === value }" :disabled="value < effectiveMinCount" @click="selectCount(value)">{{ value }}</button>
+    </div>
     <!-- Dice face row -->
     <div class="face-row">
       <button
@@ -135,12 +143,15 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
 <style scoped>
 .bid-root {
   padding: 10px 14px 14px;
-  background: linear-gradient(180deg, #2a2010ee, #1e1808f0);
-  border-top: 1px solid #d4a85320;
+  background: linear-gradient(180deg, #35135ddb, #1b1243f5);
+  border-top: 1px solid #ffffff2e;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+.quick-counts { display:flex; gap:6px; overflow-x:auto; padding:1px 2px; justify-content:center; }
+.count-chip { min-width:32px; height:32px; border-radius:999px; border:1px solid #ffffff45; color:#f6eeff; background:#ffffff16; font-weight:700; cursor:pointer; }
+.count-chip--active { color:#211045; background:#6ff2ff; border-color:#fff; box-shadow:0 0 14px #6ff2ff90; }.count-chip:disabled { opacity:.25; }
 
 /* ── Dice face row ── */
 .face-row {
@@ -155,7 +166,7 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   padding: 4px;
   border-radius: 10px;
   border: 2px solid transparent;
-  background: #1a140888;
+  background: #ffffff15;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -165,10 +176,10 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
 }
 
 .face-btn--active {
-  border-color: #d4a853;
-  background: #d4a85318;
+  border-color: #6ff2ff;
+  background: #6ff2ff22;
   transform: scale(1.12);
-  box-shadow: 0 0 12px #d4a85330;
+  box-shadow: 0 0 14px #6ff2ff75;
 }
 
 .face-img {
@@ -190,8 +201,8 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   display: flex;
   align-items: center;
   border-radius: 10px;
-  background: #14100808;
-  border: 1px solid #d4a85320;
+  background: #ffffff10;
+  border: 1px solid #ffffff36;
   overflow: hidden;
 }
 
@@ -200,7 +211,7 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   height: 38px;
   background: none;
   border: none;
-  color: #d4a853;
+  color: #7af4ff;
   font-size: 22px;
   font-weight: 700;
   cursor: pointer;
@@ -215,12 +226,12 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   text-align: center;
   font-size: 24px;
   font-weight: 700;
-  color: #f0d080;
+  color: #fff;
   line-height: 1;
 }
 
 .bid-label {
-  color: #6a5a38;
+  color: #d8c8ff;
   font-size: 15px;
 }
 
@@ -228,8 +239,8 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   width: 38px;
   height: 38px;
   border-radius: 8px;
-  background: #d4a85310;
-  border: 1px solid #d4a85325;
+  background: #ffffff15;
+  border: 1px solid #ffffff40;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,9 +255,9 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
 .mode-btn {
   padding: 7px 16px;
   border-radius: 8px;
-  border: 1px solid #d4a85330;
-  background: linear-gradient(180deg, #3a3018, #2a2210);
-  color: #d4a853;
+  border: 1px solid #ffffff52;
+  background: #ffffff16;
+  color: #fff;
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -275,8 +286,8 @@ const modeText = computed(() => mode.value === 'fei' ? t('game.modeFei') : t('ga
   border: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  background: linear-gradient(180deg, #e8c050, #c49a38, #a07a20);
-  color: #1a1208;
+  background: linear-gradient(135deg, #62edf4, #b17aff 55%, #ff69b4);
+  color: #201044;
   font-size: 15px;
   font-weight: 700;
   box-shadow: 0 1px 0 #f0d880 inset, 0 -1px 0 #886818 inset, 0 3px 10px #c49a3840;

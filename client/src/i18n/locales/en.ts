@@ -16,6 +16,8 @@ const messages: MessageSchema = {
     copyLink: 'Copy Link',
     tgShareText: "Come play Liar's Dice!",
     tgShare: 'Share on TG',
+    leaveTable: 'Leave table',
+    backToLobby: 'Back to lobby',
   },
   home: {
     title: 'Liar\'s Dice',
@@ -30,6 +32,9 @@ const messages: MessageSchema = {
     errorCreate: 'Failed to create room',
     errorJoin: 'Failed to join room',
     defaultPlayerName: 'Player',
+    soloBattle: 'Play a Bot',
+    publicTables: 'Public Tables',
+    joinTable: 'Join table',
   },
   lobby: {
     roomLabel: 'Room',
@@ -81,6 +86,7 @@ const messages: MessageSchema = {
     confirmBidPrefix: 'Call!',
     rolledTag: 'rolled',
     myDice: 'My Dice',
+    botThinking: '{name} is thinking…',
   },
   result: {
     title: 'Reveal!',

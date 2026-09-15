@@ -7,6 +7,7 @@ export interface Player {
   connected: boolean
   score: number
   rolled: boolean
+  is_bot?: boolean
 }
 
 export interface Bid {

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"sync"
@@ -43,6 +44,8 @@ type Room struct {
 	RoundNum   int          `json:"round_num"`
 	Settings   RoomSettings `json:"settings"`
 	CreatedAt  time.Time    `json:"created_at"`
+	Title      string       `json:"title,omitempty"`
+	Public     bool         `json:"public"`
 	LastActive time.Time    `json:"-"`
 	mu         sync.RWMutex
 }
@@ -56,6 +59,27 @@ type Player struct {
 	Connected bool   `json:"connected"`
 	Score     int    `json:"score"`
 	Rolled    bool   `json:"rolled"`
+	IsBot     bool   `json:"is_bot"`
+}
+
+const DefaultBotID = "bot-fox"
+
+// AddDefaultBot makes a room immediately playable by one human. The bot is a
+// normal room player: its dice and decisions stay on the authoritative server.
+func (r *Room) AddDefaultBot() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Players = append(r.Players, &Player{
+		ID: DefaultBotID, Name: "阿狐", Avatar: "bot-fox", Ready: true,
+		Connected: true, IsBot: true,
+	})
+	r.LastActive = time.Now()
+}
+
+func (r *Room) Snapshot() ([]byte, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return json.Marshal(r)
 }
 
 type Round struct {
@@ -91,7 +115,7 @@ const inviteCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 func DefaultSettings() RoomSettings {
 	return RoomSettings{
-		MaxPlayers:    8,
+		MaxPlayers:    4,
 		DicePerPlayer: 5,
 		Punishments: []Punishment{
 			{Key: "punishment.drink1", Text: "飲一杯", Level: 1, Weight: 40},
@@ -134,10 +158,18 @@ func NewRoom(hostID, hostName, hostAvatar string) *Room {
 			},
 		},
 		Status:     StatusWaiting,
+		Title:      generateRoomTitle(),
 		Settings:   DefaultSettings(),
 		CreatedAt:  now,
 		LastActive: now,
 	}
+}
+
+var roomTitlePrefixes = []string{"听雨", "长风", "松月", "青溪", "归云", "照影", "落霞", "白露", "临江", "拂雪"}
+var roomTitleSuffixes = []string{"楼", "台", "庄", "渡", "堂", "阁", "馆", "坪", "驿", "社"}
+
+func generateRoomTitle() string {
+	return roomTitlePrefixes[rand.Intn(len(roomTitlePrefixes))] + roomTitleSuffixes[rand.Intn(len(roomTitleSuffixes))]
 }
 
 func (r *Room) AddPlayer(id, name, avatar string) error {

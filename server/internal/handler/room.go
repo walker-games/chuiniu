@@ -26,7 +26,8 @@ func (h *RoomHandler) Create(c *gin.Context) {
 
 	// Accept name from request body or query
 	var req struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		VsBot bool   `json:"vs_bot"`
 	}
 	c.ShouldBindJSON(&req)
 	if req.Name != "" {
@@ -34,7 +35,12 @@ func (h *RoomHandler) Create(c *gin.Context) {
 	}
 
 	avatar := ""
-	room := h.manager.CreateRoom(userID, username, avatar)
+	var room *game.Room
+	if req.VsBot {
+		room = h.manager.CreateBotRoom(userID, username, avatar)
+	} else {
+		room = h.manager.CreateRoom(userID, username, avatar)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"room_id": room.ID,
@@ -58,6 +64,10 @@ func (h *RoomHandler) Get(c *gin.Context) {
 		"player_count": len(room.Players),
 		"max_players":  room.Settings.MaxPlayers,
 	})
+}
+
+func (h *RoomHandler) ListPublic(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"rooms": h.manager.PublicRooms()})
 }
 
 type JoinRequest struct {

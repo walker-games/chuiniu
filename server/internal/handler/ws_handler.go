@@ -82,6 +82,7 @@ func (h *WSHandler) Handle(c *gin.Context) {
 		time.Sleep(100 * time.Millisecond)
 		h.hub.BroadcastRoomState(room)
 	}()
+	h.hub.EnsureAutomation(room)
 }
 
 // Client wraps ws.Client for the handler package.

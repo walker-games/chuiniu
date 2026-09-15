@@ -1,4 +1,7 @@
+import { ref } from 'vue'
+
 let ctx: AudioContext | null = null
+const muted = ref(localStorage.getItem('chuiniu-muted') === '1')
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext()
@@ -140,12 +143,21 @@ export function useAudio() {
   }
 
   function play(name: string) {
+    if (muted.value) return
     sounds[name]?.()
+  }
+
+  function toggleMuted() {
+    muted.value = !muted.value
+    localStorage.setItem('chuiniu-muted', muted.value ? '1' : '0')
+    // A short confirmation is deliberately tied to the click gesture, so
+    // browsers are allowed to start the WebAudio context.
+    if (!muted.value) tone(880, 0.08, 0.09, 'sine')
   }
 
   function stop(_name: string) {
     // Synthesized sounds auto-stop, no-op
   }
 
-  return { init, play, stop }
+  return { init, play, stop, muted, toggleMuted }
 }

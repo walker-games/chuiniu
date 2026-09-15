@@ -23,11 +23,15 @@ async function authFetch(path: string, options: RequestInit = {}) {
   return res.json()
 }
 
-export function createRoom(name?: string) {
-  return authFetch('/api/v1/rooms', {
-    method: 'POST',
-    body: JSON.stringify({ name: name || '' }),
-  })
+export function createRoom(name?: string, vsBot = false) {
+	return authFetch('/api/v1/rooms', {
+		method: 'POST',
+		body: JSON.stringify({ name: name || '', vs_bot: vsBot }),
+	})
+}
+
+export function listPublicRooms(): Promise<{ rooms: Array<{ id: string; code: string; title: string; player_count: number; max_players: number }> }> {
+	return authFetch('/public/rooms')
 }
 
 export function joinRoom(code: string, name?: string) {

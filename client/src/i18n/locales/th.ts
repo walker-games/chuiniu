@@ -16,6 +16,8 @@ const messages: MessageSchema = {
     copyLink: 'คัดลอกลิงก์',
     tgShareText: 'มาเล่นโกหกทอยลูกเต๋ากัน!',
     tgShare: 'แชร์ใน TG',
+    leaveTable: 'ออกจากโต๊ะ',
+    backToLobby: 'กลับล็อบบี้',
   },
   home: {
     title: 'โกหกทอยลูกเต๋า',
@@ -30,6 +32,9 @@ const messages: MessageSchema = {
     errorCreate: 'สร้างห้องไม่สำเร็จ',
     errorJoin: 'เข้าร่วมห้องไม่สำเร็จ',
     defaultPlayerName: 'ผู้เล่น',
+    soloBattle: 'เล่นกับบอท',
+    publicTables: 'โต๊ะสาธารณะ',
+    joinTable: 'เข้าร่วมโต๊ะ',
   },
   lobby: {
     roomLabel: 'ห้อง',
@@ -81,6 +86,7 @@ const messages: MessageSchema = {
     confirmBidPrefix: 'เรียก!',
     rolledTag: 'ทอยแล้ว',
     myDice: 'ลูกเต๋าของฉัน',
+    botThinking: '{name} กำลังคิด…',
   },
   result: {
     title: 'เปิดไพ่!',

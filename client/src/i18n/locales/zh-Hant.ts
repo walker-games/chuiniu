@@ -16,6 +16,8 @@ const messages: MessageSchema = {
     copyLink: '複製連結',
     tgShareText: '來吹牛骰子!',
     tgShare: 'TG 分享',
+    leaveTable: '離開牌桌',
+    backToLobby: '返回大廳',
   },
   home: {
     title: '吹牛骰子',
@@ -30,6 +32,9 @@ const messages: MessageSchema = {
     errorCreate: '創建房間失敗',
     errorJoin: '加入房間失敗',
     defaultPlayerName: '玩家',
+    soloBattle: '挑戰機器人',
+    publicTables: '大廳牌桌',
+    joinTable: '入座',
   },
   lobby: {
     roomLabel: '房間',
@@ -81,6 +86,7 @@ const messages: MessageSchema = {
     confirmBidPrefix: '叫!',
     rolledTag: '已搖',
     myDice: '我的骰子',
+    botThinking: '{name} 正在思考…',
   },
   result: {
     title: '開獎!',

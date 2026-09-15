@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
@@ -17,11 +17,12 @@ import type { ChatMessage } from '@/types/game'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
 const { connected, connect, send, on } = useWebSocket()
-const { init: initAudio, play } = useAudio()
+const { play, muted, toggleMuted } = useAudio()
 
 const roomId = route.params.roomId as string
 const myId = computed(() => authStore.user?.id ?? '')
@@ -36,6 +37,7 @@ const hasRolled = ref(false)
 const showNextRound = ref(false)
 const isShaking = ref(false)
 const eyeBtn = ref<HTMLDivElement | null>(null)
+const botCue = ref('')
 
 // Bid announcement state
 const bidAnnounce = ref({ visible: false, text: '', playerName: '' })
@@ -144,8 +146,9 @@ function handleNextRound() {
   send('ready', { ready: true })
 }
 
+function leaveTable() { router.push('/') }
+
 onMounted(() => {
-  initAudio()
   connect(roomId, authStore.token, authStore.user?.name)
 
   addMsg('system', t('game.systemEnterRoom'))
@@ -215,6 +218,7 @@ onMounted(() => {
       text: t('result.bidDisplayTemplate', { count: data.count, face: data.face, mode: modeText }),
       playerName: name,
     }
+    if (data.player_id !== myId.value) play('bid')
   })
 
   on('turn_change', (msg: WSMessage) => {
@@ -223,6 +227,13 @@ onMounted(() => {
     gameStore.setTurn(turnId)
     const name = getPlayerName(turnId)
     addMsg('system', t('game.turnOf', { name }))
+  })
+
+  on('voice_cue', (msg: WSMessage) => {
+    const data = msg.data as { actor_id?: string; cue?: string }
+    if (!data.actor_id) return
+    botCue.value = t('game.botThinking', { name: getPlayerName(data.actor_id) })
+    setTimeout(() => { botCue.value = '' }, 1800)
   })
 
   on('challenge_result', (msg: WSMessage) => {
@@ -310,7 +321,18 @@ onMounted(() => {
     <div class="game-topbar shrink-0">
       <span class="font-serif-cn topbar-round">{{ t('game.roundN', { n: roundNumber }) }}</span>
       <span class="topbar-players">{{ t('game.playersTotal', { n: playerCount }) }}</span>
+      <button class="topbar-sound" type="button" :aria-label="muted ? '开启音效' : '关闭音效'" @click="toggleMuted">{{ muted ? '🔇' : '🔊' }}</button>
+      <button class="topbar-exit" type="button" @click="leaveTable">{{ t('common.leaveTable') }}</button>
     </div>
+
+    <div class="table-players" aria-label="players">
+      <div v-for="player in players" :key="player.id" class="table-player" :class="{ 'table-player--turn': player.id === gameStore.currentTurn, 'table-player--bot': player.is_bot }">
+        <span class="table-avatar">{{ player.is_bot ? '🦊' : '🙂' }}</span>
+        <span>{{ player.id === myId ? t('common.you') : player.name }}</span>
+        <i v-if="player.rolled" class="table-ready">●</i>
+      </div>
+    </div>
+    <div v-if="botCue" class="bot-cue">{{ botCue }}</div>
 
     <!-- Chat feed -->
     <ChatFeed :messages="messages" />
@@ -424,12 +446,21 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 38%, oklch(28% 0.06 60 / 0.9) 0%, transparent 70%),
-    radial-gradient(ellipse at 50% 100%, oklch(20% 0.05 55) 0%, oklch(10% 0.02 55) 100%),
-    #1a1508;
+  background: radial-gradient(ellipse 100% 48% at 50% 15%, #ff4fa450 0%, transparent 66%), radial-gradient(ellipse 90% 50% at 50% 100%, #23c8df42 0%, transparent 70%), linear-gradient(180deg,#28114a,#120b2d 70%,#1b0c37);
   overflow: hidden;
 }
+.game-shell::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.24; background-image:radial-gradient(circle,#fff8 0 1px,transparent 1.5px); background-size:32px 32px; animation:table-stars 14s linear infinite; }
+.game-shell::after { content:''; position:absolute; width:280px; height:280px; right:-130px; top:24%; border-radius:50%; background:#ff3b9a44; filter:blur(50px); pointer-events:none; animation:table-glow 3.5s ease-in-out infinite alternate; }
+@keyframes table-stars { to { transform:translateY(-32px); } } @keyframes table-glow { to { transform:scale(1.25); opacity:.7; } }
+.game-topbar { position: relative; }
+.topbar-exit { position: absolute; right: 12px; top: 10px; color: #e9d8ff; font-size: 11px; }
+.topbar-sound { position: absolute; right: 72px; top: 7px; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: #ffffff18; border: 1px solid #ffffff35; }
+.table-players { display: flex; gap: 8px; padding: 10px 14px 6px; overflow-x: auto; }
+.table-player { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #ffffff2e; border-radius: 999px; padding: 6px 9px; color: #f1e8ff; font-size: 12px; white-space: nowrap; background: #251847a8; backdrop-filter: blur(8px); }
+.table-player--turn { border-color: #67f3ff; color: #fff; box-shadow: 0 0 16px #45e6ff80; }
+.table-player--bot { color: #ffc5eb; }
+.table-avatar { font-size: 16px; }.table-ready { color: #6dffad; font-size: 9px; }
+.bot-cue { margin: 0 14px 4px; color: #fff0a8; font-size: 12px; min-height: 18px; text-shadow: 0 0 12px #ffcf4c; }
 
 /* ── Top bar ── */
 .game-topbar {
@@ -437,18 +468,18 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: linear-gradient(180deg, #2a2010cc, #1e1808aa);
-  border-bottom: 1px solid #d4a85315;
+  background: linear-gradient(180deg, #451564dd, #24124aaa);
+  border-bottom: 1px solid #ffffff20;
 }
 
 .topbar-round {
-  color: #f0d080;
+  color: #fff3a8;
   font-size: 15px;
   font-weight: 700;
 }
 
 .topbar-players {
-  color: #6a5a38;
+  color: #d8c8ff;
   font-size: 12px;
 }
 
@@ -459,8 +490,8 @@ onMounted(() => {
   justify-content: center;
   gap: 8px;
   padding: 14px 16px;
-  background: linear-gradient(180deg, #2a2010cc, #1e1808aa);
-  border-top: 1px solid #d4a85310;
+  background: linear-gradient(180deg, #351557e8, #20103ee8);
+  border-top: 1px solid #ffffff20;
 }
 
 .wait-icon {
@@ -468,7 +499,7 @@ onMounted(() => {
 }
 
 .wait-text {
-  color: #8a7442;
+  color: #f1e8ff;
   font-size: 13px;
 }
 
@@ -481,7 +512,7 @@ onMounted(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #d4a853;
+  background: #72e9ff;
   animation: dot-pulse 1.2s ease-in-out infinite;
 }
 
@@ -500,12 +531,12 @@ onMounted(() => {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #352a15, #2a2010);
-  border: 1.5px solid #d4a85340;
+  background: linear-gradient(135deg, #6d2d91, #1d235d);
+  border: 1.5px solid #ffffff60;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 12px #00000060, 0 0 16px #d4a85315;
+  box-shadow: 0 3px 12px #00000060, 0 0 18px #63eaff80;
 }
 
 /* ── Roll button: Chinese gaming table style ── */
@@ -518,14 +549,11 @@ onMounted(() => {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   /* Outer glow — warm gold ambient */
-  background: linear-gradient(180deg,
-    oklch(35% 0.12 40) 0%,
-    oklch(25% 0.1 30) 100%
-  );
+  background: linear-gradient(135deg, #ff4ca1, #7857ff 56%, #26d7e8);
   box-shadow:
-    0 1px 0 0 oklch(72% 0.14 75 / 0.15) inset,
-    0 6px 20px oklch(20% 0.1 30 / 0.5),
-    0 0 40px oklch(48% 0.2 25 / 0.15);
+    0 1px 0 0 #ffffff80 inset,
+    0 6px 20px #1d0a4f99,
+    0 0 40px #ff4ca180;
   transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms;
   overflow: hidden;
 }
@@ -538,16 +566,10 @@ onMounted(() => {
   padding: 14px 24px;
   border-radius: 14px;
   /* Rich layered gradient — dark red wood with warm highlights */
-  background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, oklch(50% 0.15 35 / 0.4) 0%, transparent 60%),
-    linear-gradient(180deg,
-      oklch(40% 0.18 28) 0%,
-      oklch(32% 0.2 25) 50%,
-      oklch(28% 0.18 22) 100%
-    );
+  background: linear-gradient(135deg, #ff70b7, #906dff 55%, #44e4ef);
   /* Top bevel highlight */
-  border-top: 1px solid oklch(60% 0.12 40 / 0.3);
-  border-bottom: 1px solid oklch(15% 0.08 20 / 0.5);
+  border-top: 1px solid #ffffff80;
+  border-bottom: 1px solid #22125b80;
 }
 
 .roll-btn-icon {
@@ -564,7 +586,7 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.2em;
-  color: oklch(82% 0.12 75);
+  color: #fff;
   text-shadow:
     0 1px 2px rgba(0,0,0,0.4),
     0 0 12px oklch(72% 0.14 75 / 0.2);

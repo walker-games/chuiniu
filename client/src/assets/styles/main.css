@@ -17,7 +17,7 @@
 
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: oklch(10% 0.02 50);
+  background: #17102e;
   color: oklch(92% 0.03 75);
   margin: 0;
   padding: 0;
@@ -25,6 +25,12 @@ body {
   line-height: 1.55;
   overflow: hidden;
 }
+
+/* Desktop is a party venue, not empty black outside a phone-sized page. */
+body::before, body::after { content: ''; position: fixed; pointer-events: none; inset: -20vmax; z-index: -1; }
+body::before { background: radial-gradient(circle at 18% 25%, #ff4c9a88 0 4%, transparent 19%), radial-gradient(circle at 82% 18%, #7d5cff88 0 5%, transparent 22%), radial-gradient(circle at 52% 84%, #ffb92e66 0 7%, transparent 28%), linear-gradient(135deg, #120a28, #201246 54%, #120c2d); animation: party-drift 14s ease-in-out infinite alternate; }
+body::after { background-image: radial-gradient(circle, #fff6 0 1px, transparent 2px); background-size: 42px 42px; opacity: .2; transform: rotate(12deg); }
+@keyframes party-drift { to { transform: translate3d(3vmax, -2vmax, 0) scale(1.08); } }
 
 /* Mobile shell: max-width + centered on PC */
 #app {
@@ -35,13 +41,13 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  background-color: oklch(14% 0.02 60);
+  background-color: #241147;
   -webkit-overflow-scrolling: touch;
 }
 
 /* On PC, ensure #app is the containing block for absolute overlays */
 @media (min-width: 431px) {
-  #app { overflow: clip; }
+  #app { overflow: clip; box-shadow: 0 24px 70px #080314aa, 0 0 0 1px #ffdc7050; }
 }
 
 /* Hide scrollbar but keep scroll */

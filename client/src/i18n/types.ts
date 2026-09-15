@@ -14,6 +14,8 @@ export type MessageSchema = {
     copyLink: string
     tgShareText: string
     tgShare: string
+    leaveTable: string
+    backToLobby: string
   }
   home: {
     title: string
@@ -28,6 +30,9 @@ export type MessageSchema = {
     errorCreate: string
     errorJoin: string
     defaultPlayerName: string
+    soloBattle: string
+    publicTables: string
+    joinTable: string
   }
   lobby: {
     roomLabel: string
@@ -79,6 +84,7 @@ export type MessageSchema = {
     confirmBidPrefix: string
     rolledTag: string
     myDice: string
+    botThinking: string
   }
   result: {
     title: string

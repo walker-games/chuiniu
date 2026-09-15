@@ -47,8 +47,21 @@ func main() {
 	// GameLog Service
 	logService := service.NewGameLogService(db)
 
+	// Redis is optional during the dual-write rollout. A failed configured
+	// connection stops startup so operators never believe recovery is enabled
+	// when it is not.
+	snapshotStore, err := service.NewRoomSnapshotStore(cfg.Redis.URL, cfg.Redis.SnapshotTTL)
+	if err != nil {
+		log.Fatalf("initialize room snapshot store: %v", err)
+	}
+	if snapshotStore != nil {
+		defer snapshotStore.Close()
+		log.Println("redis room snapshot store enabled")
+	}
+	manager.SetSnapshotRepository(snapshotStore)
+
 	// WebSocket Hub
-	hub := ws.NewHub(manager, logService)
+	hub := ws.NewHub(manager, logService, snapshotStore)
 	go hub.Run()
 
 	// Router

@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	IAM      IAMConfig      `mapstructure:"iam"`
 	Room     RoomConfig     `mapstructure:"room"`
+	Redis    RedisConfig    `mapstructure:"redis"`
 }
 
 type AppConfig struct {
@@ -40,6 +41,11 @@ type RoomConfig struct {
 	ReconnectTimeout string `mapstructure:"reconnect_timeout"`
 }
 
+type RedisConfig struct {
+	URL         string `mapstructure:"url"`
+	SnapshotTTL string `mapstructure:"snapshot_ttl"`
+}
+
 func (d DatabaseConfig) DSN() string {
 	charset := d.Charset
 	if charset == "" {
@@ -55,6 +61,10 @@ func Load(path string) (*Config, error) {
 	v.SetEnvPrefix("CHUINIU")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	// Nested keys are explicitly bound so a deployment setting such as
+	// CHUINIU_REDIS_URL cannot be silently ignored by viper.Unmarshal.
+	_ = v.BindEnv("redis.url")
+	_ = v.BindEnv("redis.snapshot_ttl")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

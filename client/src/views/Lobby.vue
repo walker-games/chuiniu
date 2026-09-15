@@ -38,6 +38,8 @@ function toggleReady() {
   send('ready', { ready: isReady.value })
 }
 
+function leaveLobby() { router.push('/') }
+
 onMounted(() => {
   connect(roomId, authStore.token, authStore.user?.name)
 
@@ -71,6 +73,7 @@ onMounted(() => {
         <span class="text-gold-dim text-xs">{{ t('lobby.playersCount', { current: players.length, max: maxSeats }) }}</span>
       </div>
       <p class="text-gold-dim text-xs mt-1.5 tracking-wider">{{ t('lobby.waitingToJoin') }}</p>
+      <button class="lobby-leave" type="button" @click="leaveLobby">← {{ t('common.backToLobby') }}</button>
     </div>
 
     <!-- Players card -->
@@ -150,6 +153,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #352a15, #2a2210);
   border: 1px solid #d4a85325;
 }
+.lobby-leave { margin-top: 10px; color: #a89055; font-size: 12px; }
 
 /* ── Card ── */
 .lobby-card {
